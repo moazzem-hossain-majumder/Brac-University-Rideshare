@@ -221,18 +221,18 @@ export default function PassengerView() {
   const [pickupCoord, setPickupCoord] = useState(() => ({
     lat: 23.8070,
     lng: 90.3686,
-    name: 'Mirpur 10 Circle',
+    name: 'Mirpur 10 Circle / Metro Station',
   }));
 
   const [dropoffCoord, setDropoffCoord] = useState(() => ({
     lat: 23.7745,
     lng: 90.4258,
-    name: 'BRACU Merul Badda Main Campus',
+    name: 'BRACU Merul Badda (Main Campus)',
   }));
 
   const [form, setForm] = useState({
-    startLocation: 'Mirpur 10 Circle',
-    endLocation: 'BRACU Merul Badda Main Campus',
+    startLocation: 'Mirpur 10 Circle / Metro Station',
+    endLocation: 'BRACU Merul Badda (Main Campus)',
     scheduledTime: new Date().toISOString(),
     seatsNeeded: 1,
   });
@@ -250,6 +250,28 @@ export default function PassengerView() {
   const currentFareEstimate = useMemo(() => {
     return estimateFare(currentDistanceKm, vehicleType);
   }, [currentDistanceKm, vehicleType]);
+
+  // Autocomplete and modal states
+  const [activeDropdown, setActiveDropdown] = useState(null); // 'pickup' | 'dropoff' | null
+  const [showFareBreakdown, setShowFareBreakdown] = useState(false);
+  const [copiedShareLink, setCopiedShareLink] = useState(false);
+
+  // Filtered location suggestions based on active input query
+  const filteredPickupSuggestions = useMemo(() => {
+    const q = (form.startLocation || '').toLowerCase().trim();
+    if (!q) return CAMPUS_LOCATIONS.slice(0, 6);
+    return CAMPUS_LOCATIONS.filter(
+      (l) => l.name.toLowerCase().includes(q) || l.area.toLowerCase().includes(q)
+    ).slice(0, 6);
+  }, [form.startLocation]);
+
+  const filteredDropoffSuggestions = useMemo(() => {
+    const q = (form.endLocation || '').toLowerCase().trim();
+    if (!q) return CAMPUS_LOCATIONS.slice(0, 6);
+    return CAMPUS_LOCATIONS.filter(
+      (l) => l.name.toLowerCase().includes(q) || l.area.toLowerCase().includes(q)
+    ).slice(0, 6);
+  }, [form.endLocation]);
 
   useEffect(() => {
     socket.connect();
@@ -318,12 +340,14 @@ export default function PassengerView() {
     const coords = findLocationCoords(locName, 2);
     setPickupCoord({ lat: coords.lat, lng: coords.lng, name: locName });
     setForm((prev) => ({ ...prev, startLocation: locName }));
+    setActiveDropdown(null);
   };
 
   const handleQuickPickDropoff = (locName) => {
     const coords = findLocationCoords(locName, 0);
     setDropoffCoord({ lat: coords.lat, lng: coords.lng, name: locName });
     setForm((prev) => ({ ...prev, endLocation: locName }));
+    setActiveDropdown(null);
   };
 
   // Swap pickup & destination
@@ -446,6 +470,76 @@ export default function PassengerView() {
           />
         )}
 
+        {/* Transparent Student Fair Fare Breakdown Modal */}
+        {showFareBreakdown && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-black font-heading text-lg text-slate-900 dark:text-white">Fair Fare Guide</h3>
+                  <p className="text-[11px] text-slate-400">Non-profit student community rate formula</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowFareBreakdown(false)}
+                  className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-2.5 text-xs">
+                <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                  <span>Base Departure ({vehicleType === 'bike' ? 'Campus Bike' : 'Carpool'}):</span>
+                  <span className="font-bold text-slate-900 dark:text-white">৳ {vehicleType === 'bike' ? 25 : 55}</span>
+                </div>
+                <div className="flex justify-between text-slate-600 dark:text-slate-300">
+                  <span>Distance ({currentDistanceKm} km × ৳{vehicleType === 'bike' ? 9 : 15}/km):</span>
+                  <span className="font-bold text-slate-900 dark:text-white">৳ {Math.round(currentDistanceKm * (vehicleType === 'bike' ? 9 : 15))}</span>
+                </div>
+                <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-bold">
+                  <span>BRACU Student Subsidy:</span>
+                  <span>− ৳ 10</span>
+                </div>
+                <div className="border-t border-slate-200 dark:border-slate-700 pt-2 flex justify-between text-sm font-black text-slate-900 dark:text-white">
+                  <span>Guaranteed Suggested Fare:</span>
+                  <span className="text-indigo-600 dark:text-indigo-400">৳ {currentFareEstimate}</span>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Zero surge pricing. Rates are calibrated specifically for BRAC University students to keep daily campus travel affordable.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => setShowFareBreakdown(false)}
+                className="w-full py-3 rounded-xl font-bold bg-indigo-600 text-white text-xs hover:bg-indigo-700 transition-colors cursor-pointer"
+              >
+                Got It
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Commute Progress Stepper (GitHub Rideshare Best Practice) ── */}
+        <div className="flex items-center justify-between px-1 pb-4 mb-3 border-b border-slate-200/80 dark:border-white/10 text-[11px] font-bold">
+          <div className={`flex items-center gap-1.5 ${view === 'request' ? 'text-indigo-600 dark:text-indigo-400 font-black' : 'text-emerald-500'}`}>
+            <span className="w-5 h-5 rounded-full border border-current flex items-center justify-center text-[10px]">1</span>
+            <span>Route</span>
+          </div>
+          <div className="w-8 h-px bg-slate-300 dark:bg-slate-700"></div>
+          <div className={`flex items-center gap-1.5 ${view === 'offers' ? 'text-indigo-600 dark:text-indigo-400 font-black' : view === 'active' ? 'text-emerald-500' : 'text-slate-400'}`}>
+            <span className="w-5 h-5 rounded-full border border-current flex items-center justify-center text-[10px]">2</span>
+            <span>Riders</span>
+          </div>
+          <div className="w-8 h-px bg-slate-300 dark:bg-slate-700"></div>
+          <div className={`flex items-center gap-1.5 ${view === 'active' ? 'text-indigo-600 dark:text-indigo-400 font-black' : 'text-slate-400'}`}>
+            <span className="w-5 h-5 rounded-full border border-current flex items-center justify-center text-[10px]">3</span>
+            <span>Live Ride</span>
+          </div>
+        </div>
+
         {/* ── State 1: Request a Ride (Booking Mode) ──────────────────── */}
         {view === 'request' && (
           <div className="space-y-6">
@@ -485,8 +579,8 @@ export default function PassengerView() {
                 </button>
 
                 <div className="space-y-4">
-                  {/* Pick-up Row */}
-                  <div>
+                  {/* Pick-up Row with Dropdown Autocomplete */}
+                  <div className="relative">
                     <div className="flex items-center justify-between mb-1.5 pr-10">
                       <div className="flex items-center gap-2">
                         <span className="w-3 h-3 rounded-full bg-emerald-500 ring-4 ring-emerald-500/20 shrink-0"></span>
@@ -509,15 +603,51 @@ export default function PassengerView() {
 
                     <input
                       value={form.startLocation}
+                      onFocus={() => setActiveDropdown('pickup')}
                       onChange={(e) => {
                         setForm({ ...form, startLocation: e.target.value });
+                        setActiveDropdown('pickup');
                         const coords = findLocationCoords(e.target.value, 2);
                         setPickupCoord({ lat: coords.lat, lng: coords.lng, name: e.target.value });
                       }}
                       required
-                      placeholder="Enter pickup area (e.g. Mirpur 10, Dhanmondi)"
+                      placeholder="Search pickup (e.g. Mirpur 10, Dhanmondi)"
                       className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800/90 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
                     />
+
+                    {/* Autocomplete Dropdown */}
+                    {activeDropdown === 'pickup' && (
+                      <div className="absolute top-full left-0 right-0 mt-1 z-30 max-h-52 overflow-y-auto rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-1.5 space-y-1">
+                        <div className="flex items-center justify-between px-3 py-1 text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800">
+                          <span>Suggested Landmarks</span>
+                          <button
+                            type="button"
+                            onClick={() => setActiveDropdown(null)}
+                            className="text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        {filteredPickupSuggestions.map((loc) => (
+                          <button
+                            key={loc.id}
+                            type="button"
+                            onMouseDown={() => {
+                              setForm((prev) => ({ ...prev, startLocation: loc.name }));
+                              setPickupCoord({ lat: loc.lat, lng: loc.lng, name: loc.name });
+                              setActiveDropdown(null);
+                            }}
+                            className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-800 flex items-center justify-between transition-colors cursor-pointer"
+                          >
+                            <span className="flex items-center gap-2">
+                              <span>{loc.isCampus ? '🎓' : '📍'}</span>
+                              <span className="font-bold">{loc.name}</span>
+                            </span>
+                            <span className="text-[10px] text-slate-400">{loc.area}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
 
                     {/* Quick pickup chips */}
                     <div className="flex flex-wrap gap-1.5 mt-2">
@@ -537,8 +667,8 @@ export default function PassengerView() {
                   {/* Route Divider Line */}
                   <div className="border-t border-dashed border-slate-200 dark:border-slate-800 my-1 ml-5"></div>
 
-                  {/* Drop-off Row */}
-                  <div>
+                  {/* Drop-off Row with Dropdown Autocomplete */}
+                  <div className="relative">
                     <div className="flex items-center justify-between mb-1.5 pr-10">
                       <div className="flex items-center gap-2">
                         <span className="w-3 h-3 rounded-md bg-rose-600 ring-4 ring-rose-500/20 shrink-0"></span>
@@ -561,15 +691,51 @@ export default function PassengerView() {
 
                     <input
                       value={form.endLocation}
+                      onFocus={() => setActiveDropdown('dropoff')}
                       onChange={(e) => {
                         setForm({ ...form, endLocation: e.target.value });
+                        setActiveDropdown('dropoff');
                         const coords = findLocationCoords(e.target.value, 0);
                         setDropoffCoord({ lat: coords.lat, lng: coords.lng, name: e.target.value });
                       }}
                       required
-                      placeholder="Enter destination (e.g. BRACU Merul Badda)"
+                      placeholder="Search destination (e.g. BRACU Merul Badda)"
                       className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-800/90 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
                     />
+
+                    {/* Autocomplete Dropdown */}
+                    {activeDropdown === 'dropoff' && (
+                      <div className="absolute top-full left-0 right-0 mt-1 z-30 max-h-52 overflow-y-auto rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-1.5 space-y-1">
+                        <div className="flex items-center justify-between px-3 py-1 text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800">
+                          <span>Popular Campus Hubs</span>
+                          <button
+                            type="button"
+                            onClick={() => setActiveDropdown(null)}
+                            className="text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        {filteredDropoffSuggestions.map((loc) => (
+                          <button
+                            key={loc.id}
+                            type="button"
+                            onMouseDown={() => {
+                              setForm((prev) => ({ ...prev, endLocation: loc.name }));
+                              setDropoffCoord({ lat: loc.lat, lng: loc.lng, name: loc.name });
+                              setActiveDropdown(null);
+                            }}
+                            className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-800 flex items-center justify-between transition-colors cursor-pointer"
+                          >
+                            <span className="flex items-center gap-2">
+                              <span>{loc.isCampus ? '🎓' : '📍'}</span>
+                              <span className="font-bold">{loc.name}</span>
+                            </span>
+                            <span className="text-[10px] text-slate-400">{loc.area}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
 
                     {/* Quick campus dropoff chips */}
                     <div className="flex flex-wrap gap-1.5 mt-2">
@@ -722,7 +888,7 @@ export default function PassengerView() {
                 </div>
               </div>
 
-              {/* Trip Fare & Distance Guarantee Card */}
+              {/* Trip Fare & Distance Guarantee Card with Breakdown Trigger */}
               <div className="p-4 rounded-3xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-indigo-500/10 dark:from-indigo-950/40 dark:via-purple-950/40 dark:to-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 flex items-center justify-between">
                 <div>
                   <div className="text-[11px] font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
@@ -733,7 +899,16 @@ export default function PassengerView() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Suggested Fare</div>
+                  <div className="flex items-center gap-1.5 justify-end">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Suggested Fare</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowFareBreakdown(true)}
+                      className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                    >
+                      ℹ️ Breakdown
+                    </button>
+                  </div>
                   <div className="text-2xl font-black font-heading text-indigo-600 dark:text-indigo-400">
                     ৳ {currentFareEstimate}
                   </div>
@@ -843,16 +1018,23 @@ export default function PassengerView() {
                               className="w-11 h-11 rounded-2xl object-cover ring-2 ring-indigo-500/30"
                             />
                           ) : (
-                            <div className="w-11 h-11 rounded-2xl bg-indigo-100 dark:bg-indigo-950/70 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center font-black text-indigo-600 dark:text-indigo-400 text-base">
+                            <div className="w-11 h-11 rounded-2xl bg-indigo-100 dark:bg-indigo-950/70 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center font-black text-indigo-600 dark:text-indigo-400 text-sm">
                               {offer.rider?.name?.[0] || 'R'}
                             </div>
                           )}
                           <div>
-                            <div className="font-black text-slate-900 dark:text-white text-sm">
-                              {offer.rider?.name}
+                            <div className="font-black text-slate-900 dark:text-white text-sm flex items-center gap-1.5">
+                              <span>{offer.rider?.name}</span>
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                ✓ Verified
+                              </span>
                             </div>
-                            <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                              {offer.rider?.department || 'BRACU Student'} · ★ 4.9
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-2 mt-0.5">
+                              <span>{offer.rider?.department || 'BRACU Student'}</span>
+                              <span>•</span>
+                              <span className="font-mono text-[10px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-bold">
+                                DHAKA METRO HA-4821
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -919,14 +1101,17 @@ export default function PassengerView() {
                   </div>
                 )}
                 <div>
-                  <div className="font-black text-base text-slate-900 dark:text-white">
-                    {activeRide.rider?.name}
+                  <div className="font-black text-base text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <span>{activeRide.rider?.name}</span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                      ✓
+                    </span>
                   </div>
                   <div className="text-xs text-slate-500 dark:text-slate-400">
                     {activeRide.rider?.phone || 'Verified BRACU Rider'}
                   </div>
-                  <div className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
-                    ✓ Verified Student Community
+                  <div className="text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 mt-1 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md inline-block">
+                    DHAKA METRO HA-4821
                   </div>
                 </div>
                 <div className="ml-auto text-right">
@@ -948,6 +1133,20 @@ export default function PassengerView() {
                   <span className="font-semibold text-slate-800 dark:text-slate-200">{activeRide.request?.endLocation}</span>
                 </div>
               </div>
+
+              {/* Share Live Ride with Guardian / Friend (GitHub Best Feature) */}
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard?.writeText(window.location.href);
+                  setCopiedShareLink(true);
+                  setTimeout(() => setCopiedShareLink(false), 2500);
+                }}
+                className="w-full py-2.5 rounded-xl border border-indigo-200 dark:border-indigo-900/60 bg-indigo-50/50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-300 text-xs font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/40 flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <span>🔗</span>
+                <span>{copiedShareLink ? '✓ Live Tracking Link Copied to Clipboard!' : 'Share Live Ride with Friend / Guardian'}</span>
+              </button>
 
               {/* Payment trigger when arrived */}
               {activeRide.status === 'Arrived' && activeRide.paymentStatus === 'Pending' && (

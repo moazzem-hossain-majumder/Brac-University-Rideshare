@@ -392,6 +392,34 @@ export default function RequestMapPicker({
     }
   }, [isDark]);
 
+  const handleRecenter = (lat, lng, zoom = 15) => {
+    if (provider === 'google' && googleMapRef.current) {
+      googleMapRef.current.panTo({ lat, lng });
+      googleMapRef.current.setZoom(zoom);
+    } else if (leafletMapRef.current) {
+      leafletMapRef.current.setView([lat, lng], zoom, { animate: true });
+    }
+  };
+
+  const handleFitRoute = () => {
+    if (pickupCoord?.lat && dropoffCoord?.lat) {
+      if (provider === 'google' && googleMapRef.current) {
+        const bounds = new window.google.maps.LatLngBounds();
+        bounds.extend({ lat: pickupCoord.lat, lng: pickupCoord.lng });
+        bounds.extend({ lat: dropoffCoord.lat, lng: dropoffCoord.lng });
+        googleMapRef.current.fitBounds(bounds);
+      } else if (leafletMapRef.current) {
+        leafletMapRef.current.fitBounds(
+          [
+            [pickupCoord.lat, pickupCoord.lng],
+            [dropoffCoord.lat, dropoffCoord.lng],
+          ],
+          { padding: [50, 50], animate: true }
+        );
+      }
+    }
+  };
+
   return (
     <div
       className={`relative overflow-hidden ${className} ${
@@ -400,22 +428,59 @@ export default function RequestMapPicker({
     >
       <div ref={mapContainerRef} className="w-full h-full" />
 
-      {/* Floating Mode Indicator & Provider Badge */}
-      <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-2">
-        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/85 backdrop-blur-md text-white text-xs font-semibold shadow-lg border border-white/10">
-          <span>{activeMode === 'pickup' ? '📍 Tap map to set Pick-up' : '🏁 Tap map to set Drop-off'}</span>
+      {/* Floating Mode Indicator & Provider Badge (Top Left) */}
+      <div className="absolute top-3 left-3 z-10 flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 backdrop-blur-md text-white text-xs font-bold shadow-lg border border-white/10">
+          <span>{activeMode === 'pickup' ? '📍 Tap map to pin Pick-up' : '🏁 Tap map to pin Drop-off'}</span>
         </div>
 
         {googleKey && (
           <button
             type="button"
             onClick={() => setProvider((p) => (p === 'google' ? 'leaflet' : 'google'))}
-            className="px-2.5 py-1.5 rounded-xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md text-slate-800 dark:text-white text-[11px] font-bold shadow-lg border border-slate-200 dark:border-white/10 hover:bg-white transition-all cursor-pointer flex items-center gap-1"
+            className="px-3 py-1.5 rounded-xl bg-white/95 dark:bg-slate-900/90 backdrop-blur-md text-slate-800 dark:text-white text-xs font-bold shadow-lg border border-slate-200 dark:border-white/10 hover:bg-white transition-all cursor-pointer flex items-center gap-1"
             title="Toggle between Google Maps and OpenStreetMap"
           >
-            <span>{provider === 'google' ? '🗺️ Google Map' : '🌍 OpenStreetMap'}</span>
+            <span>{provider === 'google' ? '🗺️ Google Maps' : '🌍 OpenStreetMap'}</span>
           </button>
         )}
+
+        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-500/15 backdrop-blur-md border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[11px] font-bold shadow-xs">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>Normal Campus Traffic</span>
+        </div>
+      </div>
+
+      {/* Floating Campus Quick Jump & Fit Route Controls (Top Right) */}
+      <div className="absolute top-3 right-3 z-10 flex flex-col gap-1.5 items-end">
+        <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md shadow-xl border border-slate-200/80 dark:border-white/10">
+          <button
+            type="button"
+            onClick={() => handleRecenter(23.7745, 90.4258, 16)}
+            className="px-2.5 py-1 rounded-xl text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-800 hover:text-indigo-600 transition-colors cursor-pointer"
+            title="Recenter to BRACU Merul Badda Main Campus"
+          >
+            🏫 Main Campus
+          </button>
+          <button
+            type="button"
+            onClick={() => handleRecenter(23.7788, 90.4042, 16)}
+            className="px-2.5 py-1 rounded-xl text-[11px] font-bold text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-800 hover:text-indigo-600 transition-colors cursor-pointer"
+            title="Recenter to BRACU Mohakhali Campus"
+          >
+            🏫 Mohakhali
+          </button>
+          {pickupCoord?.lat && dropoffCoord?.lat && (
+            <button
+              type="button"
+              onClick={handleFitRoute}
+              className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors cursor-pointer shadow-xs"
+              title="Fit entire route into map view"
+            >
+              ⛶ Fit Route
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
