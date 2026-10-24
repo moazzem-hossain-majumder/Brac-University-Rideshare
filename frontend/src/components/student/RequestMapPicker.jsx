@@ -64,6 +64,7 @@ export default function RequestMapPicker({
   dropoffCoord,
   activeMode, // 'pickup' | 'dropoff'
   onSelectLocation,
+  className = 'w-full h-full min-h-[300px]',
 }) {
   const { isDark } = useTheme();
   const mapContainerRef = useRef(null);
@@ -393,7 +394,7 @@ export default function RequestMapPicker({
 
   return (
     <div
-      className={`relative w-full h-56 sm:h-64 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-inner ${
+      className={`relative overflow-hidden ${className} ${
         provider === 'leaflet' && isDark && !cartoKey ? 'dark-map-tiles' : ''
       }`}
     >

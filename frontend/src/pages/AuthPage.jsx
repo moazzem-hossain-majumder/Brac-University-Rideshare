@@ -73,59 +73,79 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen flex bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white selection:bg-indigo-500 selection:text-white">
-      {/* Left Panel: Brand Showcase */}
-      <div className="hidden lg:flex flex-1 flex-col justify-between p-16 relative overflow-hidden">
+      {/* Left Panel: Brand Showcase with Cinematic Background */}
+      <div
+        className="hidden lg:flex flex-1 flex-col justify-between p-16 relative overflow-hidden bg-cover bg-center"
+        style={{
+          backgroundImage:
+            "linear-gradient(to right, rgba(2, 6, 23, 0.94), rgba(15, 23, 42, 0.78)), url('/campus_hero.jpg')",
+        }}
+      >
         {/* Glow ambient background elements */}
         <div className="absolute -top-24 -left-24 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl pointer-events-none" />
 
         {/* Brand Header */}
-        <div className="relative z-10 flex items-center gap-3.5">
+        <div className="relative z-10 flex items-center gap-4">
           <img
             src="/bracu_logo.png"
             alt="BRAC University Rideshare"
-            className="w-12 h-12 rounded-2xl object-cover ring-2 ring-indigo-400/40 shadow-xl shadow-indigo-500/25"
+            className="w-14 h-14 rounded-2xl object-cover ring-2 ring-indigo-400/40 shadow-2xl shadow-indigo-500/30"
           />
           <div>
-            <div className="font-heading font-black text-lg tracking-tight">BRAC University</div>
-            <div className="text-xs uppercase tracking-widest text-indigo-400 font-bold">Campus Rideshare</div>
+            <div className="font-heading font-black text-xl tracking-tight text-white">BRAC University</div>
+            <div className="text-xs uppercase tracking-widest text-indigo-400 font-bold">Campus Rideshare Network</div>
           </div>
         </div>
 
         {/* Hero Pitch */}
         <div className="relative z-10 max-w-lg my-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/15 border border-indigo-400/30 text-indigo-300 text-xs font-semibold mb-6">
-            <span>🎓</span> Verified BRACU Students Only
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 text-xs font-bold mb-6 backdrop-blur-md">
+            <span>🎓</span> Verified BRACU Students Only (@g.bracu.ac.bd)
           </div>
-          <h1 className="text-5xl font-extrabold leading-tight tracking-tight font-heading mb-6">
-            Smarter, safer <br />
+          <h1 className="text-5xl font-black leading-tight tracking-tight font-heading mb-6 text-white">
+            Dhaka traffic solved. <br />
             <span className="bg-gradient-to-r from-indigo-400 via-purple-300 to-pink-400 bg-clip-text text-transparent">
-              campus rides
+              Every campus commute,
             </span>{' '}
-            every day.
+            simplified.
           </h1>
-          <p className="text-slate-300 text-base leading-relaxed mb-10">
-            Split costs, beat Dhaka traffic, and travel comfortably between Merul Badda, Mohakhali, Banani, Mirpur, and Uttara with fellow students.
+          <p className="text-slate-300 text-base leading-relaxed mb-8">
+            Commute effortlessly between Merul Badda, Mohakhali, Banani, Mirpur, Dhanmondi, and Uttara with verified fellow students.
           </p>
 
+          {/* Vehicle previews */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md">
-              <div className="text-2xl mb-1">🏍️ 🚗</div>
-              <div className="font-bold text-sm text-white">Bike & Carpool</div>
-              <div className="text-xs text-slate-400 mt-0.5">Flexible commute options tailored to students</div>
+            <div className="p-4 rounded-3xl bg-slate-900/70 border border-white/10 backdrop-blur-xl flex items-center gap-3.5 shadow-lg">
+              <img
+                src="/bike_vehicle.jpg"
+                alt="Campus Bike"
+                className="w-16 h-12 rounded-xl object-cover ring-1 ring-white/20 shrink-0"
+              />
+              <div>
+                <div className="font-bold text-sm text-white">Campus Bike</div>
+                <div className="text-[11px] text-slate-400">Fast solo ride · ৳ 25 base</div>
+              </div>
             </div>
-            <div className="p-4 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md">
-              <div className="text-2xl mb-1">🗺️ ⚡</div>
-              <div className="font-bold text-sm text-white">Live Tracking</div>
-              <div className="text-xs text-slate-400 mt-0.5">Real-time GPS routing with safety SOS hotline</div>
+
+            <div className="p-4 rounded-3xl bg-slate-900/70 border border-white/10 backdrop-blur-xl flex items-center gap-3.5 shadow-lg">
+              <img
+                src="/car_vehicle.jpg"
+                alt="Student Carpool"
+                className="w-16 h-12 rounded-xl object-cover ring-1 ring-white/20 shrink-0"
+              />
+              <div>
+                <div className="font-bold text-sm text-white">Student Carpool</div>
+                <div className="text-[11px] text-slate-400">AC comfort · 1-4 seats</div>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Footer info */}
-        <div className="relative z-10 flex items-center justify-between text-xs text-slate-500 pt-6 border-t border-white/10">
+        <div className="relative z-10 flex items-center justify-between text-xs text-slate-400 pt-6 border-t border-white/10">
           <span>BRAC University • Merul Badda, Dhaka</span>
-          <span>Safe Student Mobility</span>
+          <span>100% Student Verified Platform</span>
         </div>
       </div>
 
