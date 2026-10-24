@@ -3,15 +3,21 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useTheme } from '../../context/ThemeContext';
 
-// CartoDB Tile URLs for Light & Dark mode
+const cartoKey = import.meta.env.VITE_CARTO_API_KEY || '';
+
+// Tile URLs for Light & Dark mode (Free OpenStreetMap by default, or Carto if key is present)
 const TILES = {
   dark: {
-    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; OpenStreetMap',
+    url: cartoKey
+      ? `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?api_key=${cartoKey}`
+      : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   },
   light: {
-    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; OpenStreetMap',
+    url: cartoKey
+      ? `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?api_key=${cartoKey}`
+      : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   },
 };
 
@@ -313,7 +319,7 @@ export default function LiveRideMap({
   };
 
   return (
-    <div className={`relative w-full rounded-3xl overflow-hidden border shadow-2xl transition-all duration-300 ${isDark ? 'border-slate-800 bg-slate-900 shadow-indigo-500/10' : 'border-slate-200 bg-white shadow-slate-300/40'} ${className}`}>
+    <div className={`relative w-full rounded-3xl overflow-hidden border shadow-2xl transition-all duration-300 ${isDark ? 'border-slate-800 bg-slate-900 shadow-indigo-500/10' : 'border-slate-200 bg-white shadow-slate-300/40'} ${isDark && !cartoKey ? 'dark-map-tiles' : ''} ${className}`}>
       {/* Map Canvas */}
       <div ref={mapContainerRef} className="w-full h-80 sm:h-96 z-0" />
 

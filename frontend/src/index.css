@@ -16,3 +16,8 @@ input, select, textarea {
 .no-spinner {
   -moz-appearance: textfield;
 }
+
+/* Dark mode map tile styling for free OpenStreetMap tiles without API key */
+.dark-map-tiles .leaflet-tile-pane {
+  filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+}

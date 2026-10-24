@@ -4,14 +4,20 @@ import 'leaflet/dist/leaflet.css';
 import { useTheme } from '../../context/ThemeContext';
 import { CAMPUS_LOCATIONS } from '../../constants/locations';
 
+const cartoKey = import.meta.env.VITE_CARTO_API_KEY || '';
+
 const TILES = {
   dark: {
-    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; CARTO &copy; OpenStreetMap',
+    url: cartoKey
+      ? `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?api_key=${cartoKey}`
+      : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   },
   light: {
-    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-    attribution: '&copy; CARTO &copy; OpenStreetMap',
+    url: cartoKey
+      ? `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?api_key=${cartoKey}`
+      : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   },
 };
 
@@ -209,7 +215,7 @@ export default function RequestMapPicker({
   }, [pickupCoord, dropoffCoord]);
 
   return (
-    <div className="relative w-full h-56 sm:h-64 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-inner">
+    <div className={`relative w-full h-56 sm:h-64 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-inner ${isDark && !cartoKey ? 'dark-map-tiles' : ''}`}>
       <div ref={mapContainerRef} className="w-full h-full" />
       {/* Floating Mode Indicator / Instruction Badge */}
       <div className="absolute top-2.5 left-2.5 z-[1000] pointer-events-none">
