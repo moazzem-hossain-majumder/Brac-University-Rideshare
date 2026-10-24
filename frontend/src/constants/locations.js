@@ -35,6 +35,14 @@ export const CAMPUS_LOCATIONS = [
     isCampus: false,
   },
   {
+    id: 'mirpur_13',
+    name: 'Mirpur 13 / BRTA',
+    area: 'Mirpur',
+    lat: 23.8040,
+    lng: 90.3780,
+    isCampus: false,
+  },
+  {
     id: 'dhanmondi_27',
     name: 'Dhanmondi 27 / Rapa Plaza',
     area: 'Dhanmondi',
@@ -59,11 +67,11 @@ export const CAMPUS_LOCATIONS = [
     isCampus: false,
   },
   {
-    id: 'uttara_jasimuddin',
-    name: 'Uttara Jasimuddin Road',
+    id: 'uttara',
+    name: 'Uttara (Sector 3 / Azampur)',
     area: 'Uttara',
-    lat: 23.8540,
-    lng: 90.4010,
+    lat: 23.8600,
+    lng: 90.4000,
     isCampus: false,
   },
   {
@@ -115,12 +123,46 @@ export const CAMPUS_LOCATIONS = [
     isCampus: false,
   },
   {
-    id: 'kuril_bishwa',
+    id: 'kuril',
     name: 'Kuril Bishwa Road Flyover',
     area: 'Kuril',
     lat: 23.8190,
     lng: 90.4190,
     isCampus: false,
+  },
+];
+
+// Vehicle Types (Bike vs Car vs CNG)
+export const VEHICLE_TYPES = [
+  {
+    id: 'bike',
+    name: 'Bike',
+    icon: '🏍️',
+    desc: 'Fast, solo commute',
+    baseFare: 25,
+    perKm: 9,
+    defaultSeats: 1,
+    maxSeats: 1,
+  },
+  {
+    id: 'car',
+    name: 'Car',
+    icon: '🚗',
+    desc: 'Comfort, AC, 1-4 seats',
+    baseFare: 55,
+    perKm: 15,
+    defaultSeats: 1,
+    maxSeats: 4,
+  },
+  {
+    id: 'cng',
+    name: 'CNG',
+    icon: '🛺',
+    desc: 'Budget group ride',
+    baseFare: 35,
+    perKm: 11,
+    defaultSeats: 1,
+    maxSeats: 3,
   },
 ];
 
@@ -140,10 +182,11 @@ export function calculateDistanceKm(lat1, lon1, lat2, lon2) {
   return Math.round(R * c * 10) / 10;
 }
 
-// Student friendly fare estimate (Base Tk 35 + Tk 12/km, rounded to nearest 5)
-export function estimateFare(distanceKm) {
-  if (!distanceKm || distanceKm <= 0) return 40;
-  const raw = 35 + distanceKm * 12;
+// Student friendly fare estimate based on distance and vehicle type
+export function estimateFare(distanceKm, vehicleType = 'car') {
+  if (!distanceKm || distanceKm <= 0) distanceKm = 1;
+  const vehicle = VEHICLE_TYPES.find((v) => v.id === vehicleType) || VEHICLE_TYPES[1];
+  const raw = vehicle.baseFare + distanceKm * vehicle.perKm;
   return Math.ceil(raw / 5) * 5;
 }
 

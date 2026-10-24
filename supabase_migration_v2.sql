@@ -83,6 +83,10 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ride_requests' AND column_name = 'estimated_fare') THEN
         ALTER TABLE public.ride_requests ADD COLUMN estimated_fare NUMERIC;
     END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ride_requests' AND column_name = 'vehicle_type') THEN
+        ALTER TABLE public.ride_requests ADD COLUMN vehicle_type TEXT DEFAULT 'bike';
+    END IF;
 END $$;
 
 -- 4. Add Safety & Theme Columns to profiles

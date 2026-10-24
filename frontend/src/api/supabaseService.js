@@ -22,13 +22,20 @@ export function normalizeRequest(row) {
     ...row,
     id: row.id,
     _id: row.id,
-    startLocation: row.start_location,
-    endLocation: row.end_location,
-    scheduledTime: row.scheduled_time,
-    seatsNeeded: row.seats_needed,
+    startLocation: row.start_location || row.startLocation,
+    endLocation: row.end_location || row.endLocation,
+    scheduledTime: row.scheduled_time || row.scheduledTime,
+    seatsNeeded: Number(row.seats_needed || row.seatsNeeded) || 1,
+    vehicleType: row.vehicle_type || row.vehicleType || 'bike',
+    estimatedDistance: Number(row.estimated_distance_km || row.estimated_distance || row.estimatedDistance || 0),
+    estimatedFare: Number(row.estimated_fare || row.estimatedFare || 0),
+    pickupLat: row.start_lat || row.pickup_lat || row.pickupLat,
+    pickupLng: row.start_lng || row.pickup_lng || row.pickupLng,
+    dropoffLat: row.end_lat || row.dropoff_lat || row.dropoffLat,
+    dropoffLng: row.end_lng || row.dropoff_lng || row.dropoffLng,
     passenger: row.passenger ? normalizeUser(row.passenger) : { _id: row.passenger_id, id: row.passenger_id },
     acceptedOffer: row.accepted_offer_id,
-    createdAt: row.created_at,
+    createdAt: row.created_at || row.createdAt,
   };
 }
 
@@ -38,24 +45,24 @@ export function normalizeOffer(row) {
     ...row,
     id: row.id,
     _id: row.id,
-    request: row.request_id,
+    request: row.request_id || row.request || row.requestId,
     rider: row.rider ? normalizeUser(row.rider) : { _id: row.rider_id, id: row.rider_id },
     fare: Number(row.fare),
-    createdAt: row.created_at,
+    createdAt: row.created_at || row.createdAt,
   };
 }
 
 export function normalizeActiveRide(row) {
   if (!row) return null;
   const req = row.request ? normalizeRequest(row.request) : null;
-  const pickup = row.pickup_lat && row.pickup_lng
+  const pickup = row.pickupLocation || (row.pickup_lat && row.pickup_lng
     ? { lat: Number(row.pickup_lat), lng: Number(row.pickup_lng), label: req?.startLocation || 'Pickup' }
-    : findLocationCoords(req?.startLocation, 2);
-  const dropoff = row.dropoff_lat && row.dropoff_lng
+    : findLocationCoords(req?.startLocation, 2));
+  const dropoff = row.dropoffLocation || (row.dropoff_lat && row.dropoff_lng
     ? { lat: Number(row.dropoff_lat), lng: Number(row.dropoff_lng), label: req?.endLocation || 'Destination' }
-    : findLocationCoords(req?.endLocation, 0);
+    : findLocationCoords(req?.endLocation, 0));
 
-  const riderLoc = row.rider_latitude && row.rider_longitude
+  const riderLoc = row.riderLocation || (row.rider_latitude && row.rider_longitude
     ? {
         lat: Number(row.rider_latitude),
         lng: Number(row.rider_longitude),
@@ -67,7 +74,7 @@ export function normalizeActiveRide(row) {
         lng: pickup.lng - 0.002,
         heading: 45,
         speed: 28,
-      };
+      });
 
   return {
     ...row,
@@ -75,16 +82,17 @@ export function normalizeActiveRide(row) {
     _id: row.id,
     rider: row.rider ? normalizeUser(row.rider) : { _id: row.rider_id, id: row.rider_id },
     passenger: row.passenger ? normalizeUser(row.passenger) : { _id: row.passenger_id, id: row.passenger_id },
-    request: req || { _id: row.request_id, id: row.request_id },
-    fare: Number(row.fare),
-    paymentStatus: row.payment_status,
-    paymentMethod: row.payment_method,
+    request: req || { _id: row.request_id || row.requestId, id: row.request_id || row.requestId, startLocation: pickup.label, endLocation: dropoff.label },
+    fare: Number(row.fare || 0),
+    status: row.status || 'Ongoing',
+    paymentStatus: row.payment_status || row.paymentStatus || 'Pending',
+    paymentMethod: row.payment_method || row.paymentMethod || null,
     riderLocation: riderLoc,
     pickupLocation: pickup,
     dropoffLocation: dropoff,
-    etaMinutes: row.eta_minutes || 5,
-    sosTriggered: Boolean(row.sos_triggered),
-    createdAt: row.created_at,
+    etaMinutes: row.eta_minutes || row.etaMinutes || 5,
+    sosTriggered: Boolean(row.sos_triggered || row.sosTriggered),
+    createdAt: row.created_at || row.createdAt,
   };
 }
 
@@ -254,21 +262,33 @@ export const SupabaseService = {
   // ── Ride Requests ──
   async postRideRequest(userId, requestData) {
     if (isSupabaseConfigured()) {
-      const { data, error } = await supabase
-        .from('ride_requests')
-        .insert([{
+      try {
+        const payload = {
           passenger_id: userId,
           start_location: requestData.startLocation,
           end_location: requestData.endLocation,
           scheduled_time: requestData.scheduledTime,
           seats_needed: Number(requestData.seatsNeeded) || 1,
           status: 'Open',
-        }])
-        .select('*, passenger:profiles(*)')
-        .single();
+        };
+        if (requestData.vehicleType) payload.vehicle_type = requestData.vehicleType;
+        if (requestData.estimatedDistance) payload.estimated_distance_km = Number(requestData.estimatedDistance);
+        if (requestData.estimatedFare) payload.estimated_fare = Number(requestData.estimatedFare);
+        if (requestData.pickupLat) payload.start_lat = Number(requestData.pickupLat);
+        if (requestData.pickupLng) payload.start_lng = Number(requestData.pickupLng);
+        if (requestData.dropoffLat) payload.end_lat = Number(requestData.dropoffLat);
+        if (requestData.dropoffLng) payload.end_lng = Number(requestData.dropoffLng);
 
-      if (error) throw new Error(error.message);
-      return normalizeRequest(data);
+        const { data, error } = await supabase
+          .from('ride_requests')
+          .insert([payload])
+          .select('*, passenger:profiles(*)')
+          .single();
+
+        if (!error && data) return normalizeRequest(data);
+      } catch (err) {
+        console.warn('Supabase postRideRequest note:', err);
+      }
     }
     return MockStorage.postRideRequest(userId, requestData);
   },
@@ -319,95 +339,101 @@ export const SupabaseService = {
   // ── Ride Offers ──
   async sendOffer(riderId, riderName, { requestId, fare, note }) {
     if (isSupabaseConfigured()) {
-      // Check request
-      const { data: request } = await supabase
-        .from('ride_requests')
-        .select('*')
-        .eq('id', requestId)
-        .single();
+      try {
+        const { data: request } = await supabase
+          .from('ride_requests')
+          .select('*')
+          .eq('id', requestId)
+          .single();
 
-      if (!request || request.status !== 'Open') {
-        throw new Error('Request not available');
+        if (request && request.status === 'Open') {
+          const { data: offer, error } = await supabase
+            .from('ride_offers')
+            .insert([{
+              request_id: requestId,
+              rider_id: riderId,
+              fare: Number(fare),
+              note: note || '',
+              status: 'Pending',
+            }])
+            .select('*, rider:profiles(*)')
+            .single();
+
+          if (!error && offer) {
+            await supabase.from('notifications').insert([{
+              receiver_id: request.passenger_id,
+              message: `${riderName} offered Tk ${fare} for your ride request`,
+            }]);
+            return normalizeOffer(offer);
+          }
+        }
+      } catch (err) {
+        console.warn('Supabase sendOffer note:', err);
       }
-
-      const { data: offer, error } = await supabase
-        .from('ride_offers')
-        .insert([{
-          request_id: requestId,
-          rider_id: riderId,
-          fare: Number(fare),
-          note: note || '',
-          status: 'Pending',
-        }])
-        .select('*, rider:profiles(*)')
-        .single();
-
-      if (error) throw new Error(error.message);
-
-      // Create notification for passenger
-      await supabase.from('notifications').insert([{
-        receiver_id: request.passenger_id,
-        message: `${riderName} offered Tk ${fare} for your ride request`,
-      }]);
-
-      return normalizeOffer(offer);
     }
     return MockStorage.sendOffer(riderId, riderName, { requestId, fare, note });
   },
 
   async getOffersForRequest(requestId) {
     if (isSupabaseConfigured()) {
-      const { data, error } = await supabase
-        .from('ride_offers')
-        .select('*, rider:profiles(*)')
-        .eq('request_id', requestId);
+      try {
+        const { data, error } = await supabase
+          .from('ride_offers')
+          .select('*, rider:profiles(*)')
+          .eq('request_id', requestId);
 
-      if (error) throw new Error(error.message);
-      return (data || []).map(normalizeOffer);
+        if (!error && data) return (data || []).map(normalizeOffer);
+      } catch (err) {
+        console.warn('Supabase getOffers note:', err);
+      }
     }
     return MockStorage.getOffersForRequest(requestId);
   },
 
   async acceptOffer(passengerId, passengerName, offerId) {
-    if (isSupabaseConfigured()) {
-      const { data: offer } = await supabase
-        .from('ride_offers')
-        .select('*, request:ride_requests(*)')
-        .eq('id', offerId)
-        .single();
+    const isUuid = typeof offerId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(offerId);
+    if (isSupabaseConfigured() && isUuid) {
+      try {
+        const { data: offer, error: fetchErr } = await supabase
+          .from('ride_offers')
+          .select('*, request:ride_requests(*)')
+          .eq('id', offerId)
+          .maybeSingle();
 
-      if (!offer) throw new Error('Offer not found');
-      if (offer.request.passenger_id !== passengerId) throw new Error('Not authorized');
+        if (!fetchErr && offer) {
+          await supabase.from('ride_offers').update({ status: 'Rejected' }).eq('request_id', offer.request_id);
+          await supabase.from('ride_offers').update({ status: 'Accepted' }).eq('id', offer.id);
+          await supabase.from('ride_requests').update({ status: 'Accepted', accepted_offer_id: offer.id }).eq('id', offer.request_id);
 
-      // Update offer statuses
-      await supabase.from('ride_offers').update({ status: 'Rejected' }).eq('request_id', offer.request_id);
-      await supabase.from('ride_offers').update({ status: 'Accepted' }).eq('id', offerId);
-      await supabase.from('ride_requests').update({ status: 'Accepted', accepted_offer_id: offerId }).eq('id', offer.request_id);
+          const { data: activeRide, error: activeErr } = await supabase
+            .from('active_rides')
+            .insert([{
+              request_id: offer.request_id,
+              offer_id: offer.id,
+              rider_id: offer.rider_id,
+              passenger_id: passengerId,
+              fare: offer.fare,
+              status: 'Ongoing',
+              payment_status: 'Pending',
+              pickup_lat: offer.request?.start_lat,
+              pickup_lng: offer.request?.start_lng,
+              dropoff_lat: offer.request?.end_lat,
+              dropoff_lng: offer.request?.end_lng,
+            }])
+            .select('*, rider:profiles(*), passenger:profiles(*), request:ride_requests(*)')
+            .single();
 
-      // Create active ride
-      const { data: activeRide, error: activeErr } = await supabase
-        .from('active_rides')
-        .insert([{
-          request_id: offer.request_id,
-          offer_id: offerId,
-          rider_id: offer.rider_id,
-          passenger_id: passengerId,
-          fare: offer.fare,
-          status: 'Ongoing',
-          payment_status: 'Pending',
-        }])
-        .select('*, rider:profiles(*), passenger:profiles(*), request:ride_requests(*)')
-        .single();
-
-      if (activeErr) throw new Error(activeErr.message);
-
-      // Notify rider
-      await supabase.from('notifications').insert([{
-        receiver_id: offer.rider_id,
-        message: `${passengerName} accepted your offer of Tk ${offer.fare}`,
-      }]);
-
-      return normalizeActiveRide(activeRide);
+          if (!activeErr && activeRide) {
+            await supabase.from('notifications').insert([{
+              receiver_id: offer.rider_id,
+              message: `${passengerName} accepted your offer of Tk ${offer.fare}`,
+            }]);
+            return normalizeActiveRide(activeRide);
+          }
+        }
+      } catch (err) {
+        console.warn('Supabase acceptOffer failed, falling back to local storage:', err);
+      }
     }
     return MockStorage.acceptOffer(passengerId, passengerName, offerId);
   },
@@ -844,14 +870,14 @@ const MockStorage = {
 
   getProfile(userId) {
     const db = getMockDB();
-    const user = db.users.find(u => u.id === userId);
+    const user = db.users.find(u => u.id === userId || u._id === userId);
     if (!user) throw new Error('User not found');
     return user;
   },
 
   updateProfile(userId, payload) {
     const db = getMockDB();
-    const idx = db.users.findIndex(u => u.id === userId);
+    const idx = db.users.findIndex(u => u.id === userId || u._id === userId);
     if (idx !== -1) {
       db.users[idx] = { ...db.users[idx], ...payload, profileComplete: true };
       saveMockDB(db);
@@ -862,15 +888,23 @@ const MockStorage = {
 
   postRideRequest(userId, requestData) {
     const db = getMockDB();
-    const user = db.users.find(u => u.id === userId);
+    const user = db.users.find(u => u.id === userId || u._id === userId);
+    const id = `req_${Date.now()}`;
     const newReq = {
-      id: `req_${Date.now()}`,
-      _id: `req_${Date.now()}`,
-      passenger: user,
+      id,
+      _id: id,
+      passenger: user || { id: userId, _id: userId, name: 'Passenger' },
       startLocation: requestData.startLocation,
       endLocation: requestData.endLocation,
       scheduledTime: requestData.scheduledTime,
       seatsNeeded: Number(requestData.seatsNeeded) || 1,
+      vehicleType: requestData.vehicleType || 'bike',
+      estimatedDistance: Number(requestData.estimatedDistance || 0),
+      estimatedFare: Number(requestData.estimatedFare || 0),
+      pickupLat: requestData.pickupLat,
+      pickupLng: requestData.pickupLng,
+      dropoffLat: requestData.dropoffLat,
+      dropoffLng: requestData.dropoffLng,
       status: 'Open',
       createdAt: new Date().toISOString(),
     };
@@ -891,7 +925,7 @@ const MockStorage = {
 
   cancelRequest(userId, requestId) {
     const db = getMockDB();
-    const req = db.requests.find(r => r.id === requestId);
+    const req = db.requests.find(r => r.id === requestId || r._id === requestId);
     if (req) {
       req.status = 'Cancelled';
       saveMockDB(db);
@@ -901,15 +935,18 @@ const MockStorage = {
 
   sendOffer(riderId, riderName, { requestId, fare, note }) {
     const db = getMockDB();
-    const rider = db.users.find(u => u.id === riderId);
-    const request = db.requests.find(r => r.id === requestId);
+    const rider = db.users.find(u => u.id === riderId || u._id === riderId);
+    const request = db.requests.find(r => r.id === requestId || r._id === requestId);
     if (!request || request.status !== 'Open') throw new Error('Request not available');
 
+    const id = `off_${Date.now()}`;
     const offer = {
-      id: `off_${Date.now()}`,
-      _id: `off_${Date.now()}`,
+      id,
+      _id: id,
       request: requestId,
-      rider,
+      requestId,
+      request_id: requestId,
+      rider: rider || { id: riderId, _id: riderId, name: riderName },
       fare: Number(fare),
       note: note || '',
       status: 'Pending',
@@ -918,14 +955,17 @@ const MockStorage = {
     db.offers.push(offer);
 
     // Notification
-    db.notifications.unshift({
-      id: `notif_${Date.now()}`,
-      _id: `notif_${Date.now()}`,
-      receiver_id: request.passenger._id,
-      message: `${riderName} offered Tk ${fare} for your ride request`,
-      read: false,
-      createdAt: new Date().toISOString(),
-    });
+    const passengerId = request.passenger?._id || request.passenger?.id;
+    if (passengerId) {
+      db.notifications.unshift({
+        id: `notif_${Date.now()}`,
+        _id: `notif_${Date.now()}`,
+        receiver_id: passengerId,
+        message: `${riderName} offered Tk ${fare} for your ride request`,
+        read: false,
+        createdAt: new Date().toISOString(),
+      });
+    }
 
     saveMockDB(db);
     return offer;
@@ -933,39 +973,50 @@ const MockStorage = {
 
   getOffersForRequest(requestId) {
     const db = getMockDB();
-    return db.offers.filter(o => o.request === requestId);
+    return db.offers.filter(o => o.request === requestId || o.requestId === requestId || o.request_id === requestId);
   },
 
   acceptOffer(passengerId, passengerName, offerId) {
     const db = getMockDB();
-    const offer = db.offers.find(o => o.id === offerId);
+    const offer = db.offers.find(o => o.id === offerId || o._id === offerId);
     if (!offer) throw new Error('Offer not found');
-    const request = db.requests.find(r => r.id === offer.request);
+    const reqId = typeof offer.request === 'object' ? (offer.request?.id || offer.request?._id) : (offer.request || offer.requestId || offer.request_id);
+    const request = db.requests.find(r => r.id === reqId || r._id === reqId);
 
     offer.status = 'Accepted';
-    request.status = 'Accepted';
+    if (request) request.status = 'Accepted';
 
+    const passenger = db.users.find(u => u.id === passengerId || u._id === passengerId) || { id: passengerId, _id: passengerId, name: passengerName };
+    const rider = offer.rider || { id: 'rider', _id: 'rider', name: 'Rider' };
+
+    const rideId = `act_${Date.now()}`;
     const activeRide = {
-      id: `act_${Date.now()}`,
-      _id: `act_${Date.now()}`,
-      rider: offer.rider,
-      passenger: db.users.find(u => u.id === passengerId),
-      request,
+      id: rideId,
+      _id: rideId,
+      rider,
+      passenger,
+      request: request || { id: reqId, _id: reqId, startLocation: 'Pickup', endLocation: 'Destination' },
       fare: offer.fare,
       status: 'Ongoing',
       paymentStatus: 'Pending',
+      paymentMethod: null,
+      pickupLocation: request?.pickupLat && request?.pickupLng ? { lat: request.pickupLat, lng: request.pickupLng, label: request.startLocation } : undefined,
+      dropoffLocation: request?.dropoffLat && request?.dropoffLng ? { lat: request.dropoffLat, lng: request.dropoffLng, label: request.endLocation } : undefined,
       createdAt: new Date().toISOString(),
     };
     db.activeRides.unshift(activeRide);
 
-    db.notifications.unshift({
-      id: `notif_${Date.now()}`,
-      _id: `notif_${Date.now()}`,
-      receiver_id: offer.rider.id,
-      message: `${passengerName} accepted your offer of Tk ${offer.fare}`,
-      read: false,
-      createdAt: new Date().toISOString(),
-    });
+    const riderId = rider.id || rider._id;
+    if (riderId) {
+      db.notifications.unshift({
+        id: `notif_${Date.now()}`,
+        _id: `notif_${Date.now()}`,
+        receiver_id: riderId,
+        message: `${passengerName} accepted your offer of Tk ${offer.fare}`,
+        read: false,
+        createdAt: new Date().toISOString(),
+      });
+    }
 
     saveMockDB(db);
     return activeRide;
@@ -974,14 +1025,14 @@ const MockStorage = {
   getMyActiveRide(userId) {
     const db = getMockDB();
     return db.activeRides.find(
-      r => (r.rider?._id === userId || r.passenger?._id === userId) && ['Ongoing', 'Arrived'].includes(r.status)
+      r => (r.rider?._id === userId || r.rider?.id === userId || r.passenger?._id === userId || r.passenger?.id === userId) && ['Ongoing', 'Arrived'].includes(r.status)
     ) || null;
   },
 
   getRideHistory(userId) {
     const db = getMockDB();
     return db.activeRides.filter(
-      r => (r.rider?._id === userId || r.passenger?._id === userId) && r.status === 'Completed'
+      r => (r.rider?._id === userId || r.rider?.id === userId || r.passenger?._id === userId || r.passenger?.id === userId) && r.status === 'Completed'
     );
   },
 
