@@ -797,12 +797,12 @@ export default function PassengerView() {
             />
           </div>
 
-          {/* 4. Vehicle Selection (Bike vs Car vs CNG) */}
+          {/* 4. Vehicle Selection (Bike vs Carpool) */}
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
               Select Vehicle Type
             </label>
-            <div className="grid grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-2 gap-3">
               {VEHICLE_TYPES.map((v) => {
                 const selected = vehicleType === v.id;
                 const vFare = estimateFare(currentDistanceKm, v.id);
@@ -817,16 +817,16 @@ export default function PassengerView() {
                         setForm({ ...form, seatsNeeded: v.maxSeats });
                       }
                     }}
-                    className={`relative p-3 rounded-2xl border text-left transition-all ${
+                    className={`relative p-3.5 rounded-2xl border text-left transition-all ${
                       selected
-                        ? 'border-indigo-600 bg-indigo-50/70 dark:bg-indigo-950/50 shadow-md ring-2 ring-indigo-500/30'
+                        ? 'border-indigo-600 bg-indigo-50/80 dark:bg-indigo-950/60 shadow-md ring-2 ring-indigo-500/30'
                         : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 hover:border-slate-300 dark:hover:border-slate-700'
                     }`}
                   >
-                    <div className="text-2xl mb-1">{v.icon}</div>
+                    <div className="text-3xl mb-1.5">{v.icon}</div>
                     <div className="font-bold text-sm text-slate-900 dark:text-white">{v.name}</div>
                     <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{v.desc}</div>
-                    <div className="mt-2 text-xs font-black text-indigo-600 dark:text-indigo-400">
+                    <div className="mt-2.5 text-xs font-black text-indigo-600 dark:text-indigo-400">
                       Tk {vFare}
                     </div>
                   </button>
@@ -912,13 +912,13 @@ export default function PassengerView() {
               <input
                 type="number"
                 min={1}
-                max={vehicleType === 'bike' ? 1 : vehicleType === 'cng' ? 3 : 4}
+                max={vehicleType === 'bike' ? 1 : 4}
                 value={form.seatsNeeded}
                 onChange={(e) => setForm({ ...form, seatsNeeded: +e.target.value })}
                 className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
               <span className="text-[11px] text-slate-400 mt-1 block">
-                {vehicleType === 'bike' ? '🏍️ Bike allows maximum 1 passenger seat' : vehicleType === 'cng' ? '🛺 CNG allows up to 3 seats' : '🚗 Car allows up to 4 seats'}
+                {vehicleType === 'bike' ? '🏍️ Campus Bike allows 1 passenger seat' : '🚗 Student Carpool allows up to 4 passenger seats'}
               </span>
             </div>
           </div>

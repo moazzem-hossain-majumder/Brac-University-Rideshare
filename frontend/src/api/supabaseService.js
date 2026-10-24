@@ -759,6 +759,36 @@ function getMockDB() {
         profileComplete: true,
       },
       {
+        id: 'student_moazzem',
+        _id: 'student_moazzem',
+        name: 'Moazzem Hossain',
+        email: 'moazzem@g.bracu.ac.bd',
+        phone: '01712345678',
+        userType: 'student',
+        studentId: '20201001',
+        status: 'Approved',
+        role: 'Passenger',
+        profileComplete: true,
+        location: 'Mirpur 10',
+        department: 'CSE',
+        bio: 'BRACU CSE Student · Regular Mirpur to Badda commuter',
+      },
+      {
+        id: 'student_mithil',
+        _id: 'student_mithil',
+        name: 'Mithil Rider',
+        email: 'mithil@g.bracu.ac.bd',
+        phone: '01787654321',
+        userType: 'student',
+        studentId: '20201002',
+        status: 'Approved',
+        role: 'Rider',
+        profileComplete: true,
+        location: 'Mohakhali',
+        department: 'EEE',
+        bio: 'BRACU EEE Student · Campus Bike & Carpool Rider',
+      },
+      {
         id: 'student_id_001',
         _id: 'student_id_001',
         name: 'Tanvir Ahmed',
@@ -767,6 +797,7 @@ function getMockDB() {
         userType: 'student',
         studentId: '20101420',
         status: 'Approved',
+        role: 'Passenger',
         profileComplete: true,
         location: 'Mirpur 10',
         department: 'CSE',
@@ -781,6 +812,7 @@ function getMockDB() {
         userType: 'student',
         studentId: '21101850',
         status: 'Pending',
+        role: 'Passenger',
         profileComplete: false,
         location: 'Uttara Sector 7',
         department: 'BBA',
@@ -830,7 +862,44 @@ const MockStorage = {
   login({ email, userType }) {
     const db = getMockDB();
     const cleanEmail = email.trim().toLowerCase();
-    const user = db.users.find(u => u.email.toLowerCase() === cleanEmail && u.userType === userType);
+    let user = db.users.find(u => u.email.toLowerCase() === cleanEmail && u.userType === userType);
+
+    // Auto-heal demo test accounts if user has older mock DB cached in browser
+    if (!user) {
+      if (cleanEmail === 'moazzem@g.bracu.ac.bd' || cleanEmail === 'mithil@g.bracu.ac.bd') {
+        const isMoazzem = cleanEmail.includes('moazzem');
+        user = {
+          id: isMoazzem ? 'student_moazzem' : 'student_mithil',
+          _id: isMoazzem ? 'student_moazzem' : 'student_mithil',
+          name: isMoazzem ? 'Moazzem Hossain' : 'Mithil Rider',
+          email: cleanEmail,
+          phone: isMoazzem ? '01712345678' : '01787654321',
+          userType: 'student',
+          studentId: isMoazzem ? '20201001' : '20201002',
+          status: 'Approved',
+          role: isMoazzem ? 'Passenger' : 'Rider',
+          profileComplete: true,
+          location: isMoazzem ? 'Mirpur 10' : 'Mohakhali',
+          department: isMoazzem ? 'CSE' : 'EEE',
+          bio: 'BRAC University Student Commuter',
+        };
+        db.users.push(user);
+        saveMockDB(db);
+      } else if (cleanEmail === 'admin@gmail.com' && userType === 'admin') {
+        user = {
+          id: 'admin_id_001',
+          _id: 'admin_id_001',
+          name: 'Super Admin',
+          email: 'admin@gmail.com',
+          phone: '01700000000',
+          userType: 'admin',
+          status: 'Approved',
+          profileComplete: true,
+        };
+        db.users.push(user);
+        saveMockDB(db);
+      }
+    }
 
     if (!user) throw new Error('Invalid credentials');
     if (user.userType === 'student' && user.status !== 'Approved') {

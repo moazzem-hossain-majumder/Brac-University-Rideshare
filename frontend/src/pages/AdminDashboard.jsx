@@ -63,11 +63,14 @@ export default function AdminDashboard() {
       {/* Sidebar */}
       <aside className="w-64 bg-gradient-to-b from-slate-900 to-indigo-950 flex flex-col shrink-0">
         <div className="flex items-center gap-3 px-6 py-6 border-b border-white/10">
-          <div className="w-9 h-9 bg-red-500 rounded-xl flex items-center justify-center shrink-0">
-            <span className="text-white text-lg">🛡️</span>
-          </div>
+          <img
+            src="/bracu_logo.png"
+            alt="BRACU Rideshare"
+            className="w-10 h-10 rounded-xl object-cover ring-2 ring-indigo-400/40 shadow-md shrink-0"
+          />
           <div>
-            <div className="text-white font-bold text-sm">Admin Panel</div>
+            <div className="text-white font-bold text-sm">BRACU Rideshare</div>
+            <div className="text-[11px] text-indigo-300 font-semibold">Campus Admin Console</div>
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className="text-red-400 text-xs">Super Admin</span>
               <span className="text-white/20 text-xs">•</span>

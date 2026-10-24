@@ -5,7 +5,7 @@ import { isSupabaseConfigured } from '../api/supabase';
 import { useTheme } from '../context/ThemeContext';
 
 export default function Layout({ children, navItems, activeTab, setActiveTab }) {
-  const { user, sessionRole, logout } = useAuth();
+  const { user, sessionRole, selectRole, logout } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const [showProfile, setShowProfile] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -25,31 +25,58 @@ export default function Layout({ children, navItems, activeTab, setActiveTab }) 
   return (
     <div className={`min-h-screen flex transition-colors duration-200 ${isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
       {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-slate-900 to-indigo-950 flex flex-col transition-transform duration-300 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static lg:flex`}>
-        {/* Logo */}
-        <div className="flex items-center gap-3 px-6 py-6 border-b border-white/10">
-          <div className="w-9 h-9 bg-indigo-500 rounded-xl flex items-center justify-center shrink-0">
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-            </svg>
-          </div>
-          <div>
-            <div className="text-white font-bold text-sm">BRACU Rideshare</div>
+      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-slate-900 via-slate-900 to-indigo-950 flex flex-col transition-transform duration-300 border-r border-white/10 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static lg:flex`}>
+        {/* Brand Header with Merged Logo */}
+        <div className="flex items-center gap-3 px-5 py-5 border-b border-white/10">
+          <img
+            src="/bracu_logo.png"
+            alt="BRAC University Rideshare"
+            className="w-10 h-10 rounded-xl object-cover ring-2 ring-indigo-400/40 shadow-lg shadow-indigo-500/20"
+          />
+          <div className="overflow-hidden">
+            <div className="text-white font-extrabold text-sm tracking-tight font-heading">BRACU Rideshare</div>
             <div className="flex items-center gap-1.5 mt-0.5">
-              {sessionRole && <span className={`text-xs font-medium ${sessionRole === 'Rider' ? 'text-indigo-400' : 'text-purple-400'}`}>{sessionRole}</span>}
+              {sessionRole && (
+                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
+                  sessionRole === 'Rider'
+                    ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-400/30'
+                    : 'bg-purple-500/20 text-purple-300 border border-purple-400/30'
+                }`}>
+                  {sessionRole === 'Rider' ? '🏍️ Rider' : '🧍 Passenger'}
+                </span>
+              )}
               <span className="text-white/20 text-xs">•</span>
               {isSupabaseConfigured() ? (
                 <span className="text-[10px] font-medium text-emerald-400 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Supabase
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Cloud
                 </span>
               ) : (
-                <span className="text-[10px] font-medium text-amber-300 flex items-center gap-1" title="Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Local Mode
+                <span className="text-[10px] font-medium text-amber-300 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Local
                 </span>
               )}
             </div>
           </div>
         </div>
+
+        {/* 1-Click Role Switcher */}
+        {sessionRole && user?.userType === 'student' && (
+          <div className="px-3.5 pt-3 pb-1">
+            <button
+              onClick={() => selectRole(sessionRole === 'Rider' ? 'Passenger' : 'Rider')}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-slate-200 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-all cursor-pointer shadow-sm group"
+              title={`Switch session from ${sessionRole} to ${sessionRole === 'Rider' ? 'Passenger' : 'Rider'}`}
+            >
+              <span className="flex items-center gap-2">
+                <span>{sessionRole === 'Rider' ? '🧍' : '🏍️'}</span>
+                <span>Switch to {sessionRole === 'Rider' ? 'Passenger' : 'Rider'}</span>
+              </span>
+              <span className="text-[10px] uppercase font-black text-indigo-400 group-hover:text-indigo-300">
+                ⇄
+              </span>
+            </button>
+          </div>
+        )}
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">

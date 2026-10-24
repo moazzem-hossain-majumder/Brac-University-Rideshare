@@ -90,6 +90,12 @@ export default function RequestMapPicker({
 
   // Try loading Google Maps if key exists
   useEffect(() => {
+    // Graceful fallback if Google Maps API key has quota/referrer errors
+    window.gm_authFailure = () => {
+      console.warn('Google Maps authentication failed, falling back to OpenStreetMap');
+      setProvider('leaflet');
+    };
+
     if (!googleKey) {
       setProvider('leaflet');
       return;
@@ -278,7 +284,7 @@ export default function RequestMapPicker({
         attribution: tileConfig.attribution,
       }).addTo(map);
 
-      tileLayerRef.current = tileLayer;
+      leafletTileRef.current = tileLayer;
       leafletMapRef.current = map;
 
       map.on('click', (e) => {
@@ -376,6 +382,14 @@ export default function RequestMapPicker({
       }
     }
   }, [provider, pickupCoord, dropoffCoord]);
+
+  // Update Leaflet tile layer on theme toggle
+  useEffect(() => {
+    if (leafletTileRef.current) {
+      const tileConfig = isDark ? TILES.dark : TILES.light;
+      leafletTileRef.current.setUrl(tileConfig.url);
+    }
+  }, [isDark]);
 
   return (
     <div

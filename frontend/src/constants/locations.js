@@ -132,13 +132,13 @@ export const CAMPUS_LOCATIONS = [
   },
 ];
 
-// Vehicle Types (Bike vs Car vs CNG)
+// Student Vehicle Types (Bike vs Car) - No student drives a CNG
 export const VEHICLE_TYPES = [
   {
     id: 'bike',
     name: 'Bike',
     icon: '🏍️',
-    desc: 'Fast, solo commute',
+    desc: 'Fast, solo commute with student rider',
     baseFare: 25,
     perKm: 9,
     defaultSeats: 1,
@@ -146,23 +146,13 @@ export const VEHICLE_TYPES = [
   },
   {
     id: 'car',
-    name: 'Car',
+    name: 'Car / Carpool',
     icon: '🚗',
-    desc: 'Comfort, AC, 1-4 seats',
+    desc: 'AC comfort, 1-4 campus passengers',
     baseFare: 55,
     perKm: 15,
     defaultSeats: 1,
     maxSeats: 4,
-  },
-  {
-    id: 'cng',
-    name: 'CNG',
-    icon: '🛺',
-    desc: 'Budget group ride',
-    baseFare: 35,
-    perKm: 11,
-    defaultSeats: 1,
-    maxSeats: 3,
   },
 ];
 
