@@ -1,9 +1,11 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useTheme } from '../../context/ThemeContext';
 import { CAMPUS_LOCATIONS } from '../../constants/locations';
+import { loadGoogleMapsSDK, GOOGLE_MAPS_DARK_STYLE } from '../../utils/googleMapsLoader';
 
+const googleKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 const cartoKey = import.meta.env.VITE_CARTO_API_KEY || '';
 
 const TILES = {
@@ -21,7 +23,7 @@ const TILES = {
   },
 };
 
-function createPinIcon(label, isPickup = true) {
+function createLeafletPinIcon(label, isPickup = true) {
   const bg = isPickup ? 'bg-emerald-500' : 'bg-rose-600';
   const emoji = isPickup ? '📍' : '🏁';
   return L.divIcon({
@@ -41,7 +43,6 @@ function createPinIcon(label, isPickup = true) {
   });
 }
 
-// Find nearest landmark to coordinates
 function findNearestLandmark(lat, lng) {
   let minD = Infinity;
   let nearest = null;
@@ -66,67 +67,230 @@ export default function RequestMapPicker({
 }) {
   const { isDark } = useTheme();
   const mapContainerRef = useRef(null);
-  const mapInstanceRef = useRef(null);
-  const tileLayerRef = useRef(null);
-  const pickupMarkerRef = useRef(null);
-  const dropoffMarkerRef = useRef(null);
-  const routeLineRef = useRef(null);
+
+  // Mode: 'google' (if key available) or 'leaflet'
+  const [provider, setProvider] = useState(() => (googleKey ? 'google' : 'leaflet'));
+  const [googleReady, setGoogleReady] = useState(false);
+
+  // Leaflet refs
+  const leafletMapRef = useRef(null);
+  const leafletTileRef = useRef(null);
+  const leafletPickupRef = useRef(null);
+  const leafletDropoffRef = useRef(null);
+  const leafletRouteRef = useRef(null);
+
+  // Google Maps refs
+  const googleMapRef = useRef(null);
+  const googlePickupMarkerRef = useRef(null);
+  const googleDropoffMarkerRef = useRef(null);
+  const googlePolylineRef = useRef(null);
+
   const activeModeRef = useRef(activeMode);
   activeModeRef.current = activeMode;
 
+  // Try loading Google Maps if key exists
   useEffect(() => {
-    if (!mapContainerRef.current || mapInstanceRef.current) return;
+    if (!googleKey) {
+      setProvider('leaflet');
+      return;
+    }
 
-    const center = [
-      pickupCoord?.lat || 23.7745,
-      pickupCoord?.lng || 90.4258,
-    ];
-
-    const map = L.map(mapContainerRef.current, {
-      center,
-      zoom: 13,
-      zoomControl: false,
-    });
-
-    L.control.zoom({ position: 'topright' }).addTo(map);
-
-    const tileConfig = isDark ? TILES.dark : TILES.light;
-    const tileLayer = L.tileLayer(tileConfig.url, {
-      maxZoom: 19,
-      attribution: tileConfig.attribution,
-    }).addTo(map);
-
-    tileLayerRef.current = tileLayer;
-    mapInstanceRef.current = map;
-
-    // Click on map to place pin
-    map.on('click', (e) => {
-      const { lat, lng } = e.latlng;
-      const nearestName = findNearestLandmark(lat, lng);
-      if (onSelectLocation) {
-        onSelectLocation(activeModeRef.current, {
-          lat,
-          lng,
-          name: nearestName,
-        });
-      }
-    });
-
-    return () => {
-      map.remove();
-      mapInstanceRef.current = null;
-    };
+    loadGoogleMapsSDK(googleKey)
+      .then(() => {
+        setGoogleReady(true);
+      })
+      .catch((err) => {
+        console.warn('Google Maps SDK failed to load, falling back to Leaflet:', err);
+        setProvider('leaflet');
+      });
   }, []);
 
-  // Update Tile theme
+  // ── 1. Google Maps Initialization & Render ─────────────────────────
   useEffect(() => {
-    if (!mapInstanceRef.current || !tileLayerRef.current) return;
-    tileLayerRef.current.setUrl(isDark ? TILES.dark.url : TILES.light.url);
-  }, [isDark]);
+    if (provider !== 'google' || !googleReady || !mapContainerRef.current) return;
 
-  // Update Markers & Route
+    // Cleanup Leaflet if was initialized
+    if (leafletMapRef.current) {
+      leafletMapRef.current.remove();
+      leafletMapRef.current = null;
+    }
+
+    if (!googleMapRef.current) {
+      const center = {
+        lat: pickupCoord?.lat || 23.7745,
+        lng: pickupCoord?.lng || 90.4258,
+      };
+
+      const gMap = new window.google.maps.Map(mapContainerRef.current, {
+        center,
+        zoom: 14,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+        styles: isDark ? GOOGLE_MAPS_DARK_STYLE : [],
+      });
+
+      gMap.addListener('click', (e) => {
+        const lat = e.latLng.lat();
+        const lng = e.latLng.lng();
+        const nearestName = findNearestLandmark(lat, lng);
+        if (onSelectLocation) {
+          onSelectLocation(activeModeRef.current, { lat, lng, name: nearestName });
+        }
+      });
+
+      googleMapRef.current = gMap;
+    } else {
+      googleMapRef.current.setOptions({
+        styles: isDark ? GOOGLE_MAPS_DARK_STYLE : [],
+      });
+    }
+
+    const gMap = googleMapRef.current;
+    if (!gMap) return;
+
+    const bounds = new window.google.maps.LatLngBounds();
+    let hasCoords = false;
+
+    // Pickup Marker
+    if (pickupCoord?.lat && pickupCoord?.lng) {
+      const pos = { lat: pickupCoord.lat, lng: pickupCoord.lng };
+      bounds.extend(pos);
+      hasCoords = true;
+
+      if (!googlePickupMarkerRef.current) {
+        const marker = new window.google.maps.Marker({
+          position: pos,
+          map: gMap,
+          draggable: true,
+          title: pickupCoord.name || 'Pick-up',
+          icon: {
+            url: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
+          },
+        });
+
+        marker.addListener('dragend', (e) => {
+          const lat = e.latLng.lat();
+          const lng = e.latLng.lng();
+          const nearest = findNearestLandmark(lat, lng);
+          if (onSelectLocation) {
+            onSelectLocation('pickup', { lat, lng, name: nearest });
+          }
+        });
+
+        googlePickupMarkerRef.current = marker;
+      } else {
+        googlePickupMarkerRef.current.setPosition(pos);
+        googlePickupMarkerRef.current.setTitle(pickupCoord.name || 'Pick-up');
+      }
+    } else if (googlePickupMarkerRef.current) {
+      googlePickupMarkerRef.current.setMap(null);
+      googlePickupMarkerRef.current = null;
+    }
+
+    // Dropoff Marker
+    if (dropoffCoord?.lat && dropoffCoord?.lng) {
+      const pos = { lat: dropoffCoord.lat, lng: dropoffCoord.lng };
+      bounds.extend(pos);
+      hasCoords = true;
+
+      if (!googleDropoffMarkerRef.current) {
+        const marker = new window.google.maps.Marker({
+          position: pos,
+          map: gMap,
+          draggable: true,
+          title: dropoffCoord.name || 'Drop-off',
+          icon: {
+            url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
+          },
+        });
+
+        marker.addListener('dragend', (e) => {
+          const lat = e.latLng.lat();
+          const lng = e.latLng.lng();
+          const nearest = findNearestLandmark(lat, lng);
+          if (onSelectLocation) {
+            onSelectLocation('dropoff', { lat, lng, name: nearest });
+          }
+        });
+
+        googleDropoffMarkerRef.current = marker;
+      } else {
+        googleDropoffMarkerRef.current.setPosition(pos);
+        googleDropoffMarkerRef.current.setTitle(dropoffCoord.name || 'Drop-off');
+      }
+    } else if (googleDropoffMarkerRef.current) {
+      googleDropoffMarkerRef.current.setMap(null);
+      googleDropoffMarkerRef.current = null;
+    }
+
+    // Polyline
+    if (pickupCoord?.lat && pickupCoord?.lng && dropoffCoord?.lat && dropoffCoord?.lng) {
+      const path = [
+        { lat: pickupCoord.lat, lng: pickupCoord.lng },
+        { lat: dropoffCoord.lat, lng: dropoffCoord.lng },
+      ];
+
+      if (!googlePolylineRef.current) {
+        googlePolylineRef.current = new window.google.maps.Polyline({
+          path,
+          geodesic: true,
+          strokeColor: '#6366f1',
+          strokeOpacity: 0.9,
+          strokeWeight: 4,
+          map: gMap,
+        });
+      } else {
+        googlePolylineRef.current.setPath(path);
+      }
+    } else if (googlePolylineRef.current) {
+      googlePolylineRef.current.setMap(null);
+      googlePolylineRef.current = null;
+    }
+
+    if (hasCoords) {
+      if (pickupCoord && dropoffCoord) {
+        gMap.fitBounds(bounds);
+      } else if (pickupCoord) {
+        gMap.setCenter({ lat: pickupCoord.lat, lng: pickupCoord.lng });
+      }
+    }
+  }, [provider, googleReady, isDark, pickupCoord, dropoffCoord]);
+
+  // ── 2. Leaflet Fallback / Direct Provider ──────────────────────────
   useEffect(() => {
-    const map = mapInstanceRef.current;
+    if (provider !== 'leaflet' || !mapContainerRef.current) return;
+
+    if (!leafletMapRef.current) {
+      const center = [pickupCoord?.lat || 23.7745, pickupCoord?.lng || 90.4258];
+
+      const map = L.map(mapContainerRef.current, {
+        center,
+        zoom: 13,
+        zoomControl: false,
+      });
+
+      L.control.zoom({ position: 'topright' }).addTo(map);
+
+      const tileConfig = isDark ? TILES.dark : TILES.light;
+      const tileLayer = L.tileLayer(tileConfig.url, {
+        maxZoom: 19,
+        attribution: tileConfig.attribution,
+      }).addTo(map);
+
+      tileLayerRef.current = tileLayer;
+      leafletMapRef.current = map;
+
+      map.on('click', (e) => {
+        const { lat, lng } = e.latlng;
+        const nearestName = findNearestLandmark(lat, lng);
+        if (onSelectLocation) {
+          onSelectLocation(activeModeRef.current, { lat, lng, name: nearestName });
+        }
+      });
+    }
+
+    const map = leafletMapRef.current;
     if (!map) return;
 
     const bounds = [];
@@ -135,13 +299,13 @@ export default function RequestMapPicker({
     if (pickupCoord?.lat && pickupCoord?.lng) {
       const p = [pickupCoord.lat, pickupCoord.lng];
       bounds.push(p);
-      if (!pickupMarkerRef.current) {
-        pickupMarkerRef.current = L.marker(p, {
-          icon: createPinIcon(pickupCoord.name || 'Pickup', true),
+      if (!leafletPickupRef.current) {
+        leafletPickupRef.current = L.marker(p, {
+          icon: createLeafletPinIcon(pickupCoord.name || 'Pickup', true),
           draggable: true,
         }).addTo(map);
 
-        pickupMarkerRef.current.on('dragend', (e) => {
+        leafletPickupRef.current.on('dragend', (e) => {
           const { lat, lng } = e.target.getLatLng();
           const nearest = findNearestLandmark(lat, lng);
           if (onSelectLocation) {
@@ -149,25 +313,25 @@ export default function RequestMapPicker({
           }
         });
       } else {
-        pickupMarkerRef.current.setLatLng(p);
-        pickupMarkerRef.current.setIcon(createPinIcon(pickupCoord.name || 'Pickup', true));
+        leafletPickupRef.current.setLatLng(p);
+        leafletPickupRef.current.setIcon(createLeafletPinIcon(pickupCoord.name || 'Pickup', true));
       }
-    } else if (pickupMarkerRef.current) {
-      pickupMarkerRef.current.remove();
-      pickupMarkerRef.current = null;
+    } else if (leafletPickupRef.current) {
+      leafletPickupRef.current.remove();
+      leafletPickupRef.current = null;
     }
 
     // Dropoff Marker
     if (dropoffCoord?.lat && dropoffCoord?.lng) {
       const d = [dropoffCoord.lat, dropoffCoord.lng];
       bounds.push(d);
-      if (!dropoffMarkerRef.current) {
-        dropoffMarkerRef.current = L.marker(d, {
-          icon: createPinIcon(dropoffCoord.name || 'Drop-off', false),
+      if (!leafletDropoffRef.current) {
+        leafletDropoffRef.current = L.marker(d, {
+          icon: createLeafletPinIcon(dropoffCoord.name || 'Drop-off', false),
           draggable: true,
         }).addTo(map);
 
-        dropoffMarkerRef.current.on('dragend', (e) => {
+        leafletDropoffRef.current.on('dragend', (e) => {
           const { lat, lng } = e.target.getLatLng();
           const nearest = findNearestLandmark(lat, lng);
           if (onSelectLocation) {
@@ -175,12 +339,12 @@ export default function RequestMapPicker({
           }
         });
       } else {
-        dropoffMarkerRef.current.setLatLng(d);
-        dropoffMarkerRef.current.setIcon(createPinIcon(dropoffCoord.name || 'Drop-off', false));
+        leafletDropoffRef.current.setLatLng(d);
+        leafletDropoffRef.current.setIcon(createLeafletPinIcon(dropoffCoord.name || 'Drop-off', false));
       }
-    } else if (dropoffMarkerRef.current) {
-      dropoffMarkerRef.current.remove();
-      dropoffMarkerRef.current = null;
+    } else if (leafletDropoffRef.current) {
+      leafletDropoffRef.current.remove();
+      leafletDropoffRef.current = null;
     }
 
     // Route Polyline
@@ -189,22 +353,21 @@ export default function RequestMapPicker({
         [pickupCoord.lat, pickupCoord.lng],
         [dropoffCoord.lat, dropoffCoord.lng],
       ];
-      if (!routeLineRef.current) {
-        routeLineRef.current = L.polyline(latlngs, {
+      if (!leafletRouteRef.current) {
+        leafletRouteRef.current = L.polyline(latlngs, {
           color: '#6366f1',
           weight: 4,
           opacity: 0.85,
           dashArray: '8, 8',
         }).addTo(map);
       } else {
-        routeLineRef.current.setLatLngs(latlngs);
+        leafletRouteRef.current.setLatLngs(latlngs);
       }
-    } else if (routeLineRef.current) {
-      routeLineRef.current.remove();
-      routeLineRef.current = null;
+    } else if (leafletRouteRef.current) {
+      leafletRouteRef.current.remove();
+      leafletRouteRef.current = null;
     }
 
-    // Auto fit bounds
     if (bounds.length > 0) {
       if (bounds.length === 1) {
         map.setView(bounds[0], 14, { animate: true });
@@ -212,16 +375,32 @@ export default function RequestMapPicker({
         map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15, animate: true });
       }
     }
-  }, [pickupCoord, dropoffCoord]);
+  }, [provider, pickupCoord, dropoffCoord]);
 
   return (
-    <div className={`relative w-full h-56 sm:h-64 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-inner ${isDark && !cartoKey ? 'dark-map-tiles' : ''}`}>
+    <div
+      className={`relative w-full h-56 sm:h-64 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-inner ${
+        provider === 'leaflet' && isDark && !cartoKey ? 'dark-map-tiles' : ''
+      }`}
+    >
       <div ref={mapContainerRef} className="w-full h-full" />
-      {/* Floating Mode Indicator / Instruction Badge */}
-      <div className="absolute top-2.5 left-2.5 z-[1000] pointer-events-none">
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/85 backdrop-blur-md text-white text-xs font-semibold shadow-lg border border-white/10">
+
+      {/* Floating Mode Indicator & Provider Badge */}
+      <div className="absolute top-2.5 left-2.5 z-10 flex items-center gap-2">
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/85 backdrop-blur-md text-white text-xs font-semibold shadow-lg border border-white/10">
           <span>{activeMode === 'pickup' ? '📍 Tap map to set Pick-up' : '🏁 Tap map to set Drop-off'}</span>
         </div>
+
+        {googleKey && (
+          <button
+            type="button"
+            onClick={() => setProvider((p) => (p === 'google' ? 'leaflet' : 'google'))}
+            className="px-2.5 py-1.5 rounded-xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-md text-slate-800 dark:text-white text-[11px] font-bold shadow-lg border border-slate-200 dark:border-white/10 hover:bg-white transition-all cursor-pointer flex items-center gap-1"
+            title="Toggle between Google Maps and OpenStreetMap"
+          >
+            <span>{provider === 'google' ? '🗺️ Google Map' : '🌍 OpenStreetMap'}</span>
+          </button>
+        )}
       </div>
     </div>
   );
